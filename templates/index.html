@@ -1,95 +1,222 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thompson Sampling with Visualization</title>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <title>Thompson Sampling Demo</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
+            font-family: 'Inter', sans-serif;
+            background: #f5f8fa;
+            color: #333;
+            margin: 0;
+            padding: 20px;
         }
 
-        .button-container {
-            margin: 20px;
+        h3 {
+            margin-bottom: 10px;
         }
 
-        button {
-            padding: 15px 30px;
-            margin: 10px;
+        label {
+            font-weight: 600;
+        }
+
+        select {
+            padding: 8px;
             font-size: 16px;
-            cursor: pointer;
+            margin-left: 10px;
         }
 
-        .suggestion {
+        .container {
+            display: flex;
             margin-top: 20px;
-            font-size: 18px;
+            gap: 40px;
+        }
+
+        .machine-info,
+        .visualization {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .machine-info {
+            width: 320px;
         }
 
         .visualization {
-            margin-top: 30px;
+            flex: 1;
+            max-width: 850px;
         }
 
-        
+        .machine {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .recommended {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin-right: 10px;
+            margin-top: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #suggest-btn {
+            background-color: #28a745;
+        }
+
+        #suggest-btn:hover {
+            background-color: #1e7e34;
+        }
+
+        #visualization {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+
+        #recommendation {
+            font-weight: bold;
+            margin-top: 10px;
+            font-size: 16px;
+            color: #28a745;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Thompson Sampling Visualization</h1>
-    <div class="button-container">
-        <button onclick="handleClick(0)">Button 0</button>
-        <button onclick="handleClick(1)">Button 1</button>
-        <button onclick="handleClick(2)">Button 2</button>
+    <div>
+        <label for="user-select">Select User:</label>
+        <select id="user-select">
+            {% for user in users %}
+            <option value="{{ user }}">{{ user }}</option>
+            {% endfor %}
+        </select>
     </div>
-    <div class="suggestion">
-        <strong>Suggested Button: </strong><span id="suggested-button">-</span>
+
+    <div class="container">
+        <div class="machine-info">
+            <h3>Machines</h3>
+            <div id="machines-container"></div>
+            <button id="suggest-btn">Get Recommendation</button>
+            <div id="recommendation"></div>
+        </div>
+
+        <div class="visualization">
+            <h3>Visualization</h3>
+            <img id="visualization" src="" alt="Stats Visualization" />
+        </div>
     </div>
-    <div class="visualization">
-        <img id="visualization-img" src="/visualization" alt="Visualization of Thompson Sampling">
-    </div>
+
     <script>
         const socket = io();
-        socket.on("update_visualization", (data) => {
-            const imgElement = document.getElementById("visualization-img");
-            imgElement.src = "data:image/png;base64," + data.visualization;
-        });
-        async function fetchSuggestion() {
-            try {
-                const response = await fetch("/suggest");
-                if (!response.ok) throw new Error("Failed to fetch suggestion.");
-                const data = await response.json();
-                document.getElementById("suggested-button").innerText = data.suggested_button;
-            } catch (error) {
-                console.error("Error fetching suggestion:", error);
+        let currentUser = document.getElementById('user-select').value;
+
+        function setupMachines() {
+            const container = document.getElementById('machines-container');
+            container.innerHTML = '';
+            const machineNames = ["Email", "SMS", "Push Notification"];
+            for (let i = 0; i < 3; i++) {
+                const div = document.createElement('div');
+                div.className = 'machine';
+                div.innerHTML = `
+                    <h4>${machineNames[i]}</h4>
+                    <button class="reward-btn" data-machine="${i}" data-reward="1">Success</button>
+                    <button class="reward-btn" data-machine="${i}" data-reward="0">Failure</button>
+                    <div>Selections: <span id="count-${i}">0</span></div>
+                    <div>True Reward: <span id="true-${i}">?</span></div>
+                `;
+
+                container.appendChild(div);
             }
-        }
 
-        async function handleClick(button) {
-            const reward = confirm("Was this button successful? Click OK for Yes or Cancel for No.") ? 1 : 0;
-
-            try {
-                const response = await fetch("/update", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ button: button, reward: reward })
+            document.querySelectorAll('.reward-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const machine = this.dataset.machine;
+                    const reward = parseInt(this.dataset.reward);
+                    updateMachine(machine, reward);
                 });
-
-                if (!response.ok) throw new Error("Failed to update model.");
-                const data = await response.json();
-                console.log("Updated Parameters:", data);
-
-
-                fetchSuggestion();
-            } catch (error) {
-                console.error("Error updating model:", error);
-            }
+            });
         }
-        fetchSuggestion();
+
+        function updateMachine(machine, reward) {
+            fetch('/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user: currentUser,
+                    button: machine,
+                    reward: reward
+                })
+            }).then(res => {
+                if (!res.ok) console.error("Update failed");
+            });
+        }
+
+        function updateVisualization() {
+            fetch(`/visualization?user=${currentUser}`)
+                .then(res => res.text())
+                .then(data => {
+                    document.getElementById('visualization').src = data;
+                });
+        }
+
+        document.getElementById('suggest-btn').addEventListener('click', () => {
+            const machineNames = ["Email", "SMS", "Push Notification"];
+            fetch(`/suggest?user=${currentUser}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    document.getElementById('recommendation').textContent = `Recommended: ${machineNames[data.suggested_button]}`;
+                    document.querySelectorAll('.machine').forEach((el, i) => {
+                        el.classList.toggle('recommended', i === data.suggested_button);
+                    });
+                });
+        });
+
+        socket.on('update_visualization', data => {
+            if (data.user === currentUser) {
+                data.selection_counts.forEach((count, i) => {
+                    document.getElementById(`count-${i}`).textContent = count;
+                });
+                data.true_rewards.forEach((reward, i) => {
+                    document.getElementById(`true-${i}`).textContent = reward.toFixed(3);
+                });
+                document.getElementById('visualization').src = "data:image/png;base64," + data.visualization;
+            }
+        });
+
+        document.getElementById('user-select').addEventListener('change', (e) => {
+            currentUser = e.target.value;
+            document.getElementById('recommendation').textContent = '';
+            setupMachines();
+            updateVisualization();
+        });
+
+        setupMachines();
+        updateVisualization();
     </script>
 </body>
 

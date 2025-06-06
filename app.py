@@ -49,7 +49,7 @@ def get_user_session(username):
 
 @app.route("/")
 def index():
-    return render_template("homepage.html", users=users)
+    return render_template("index.html", users=users)
 
 @app.route("/suggest", methods=["GET"])
 def suggest():
