@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thompson Sampling with Visualization</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        .button-container {
+            margin: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .suggestion {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        .visualization {
+            margin-top: 30px;
+        }
+
+        
+    </style>
+</head>
+
+<body>
+    <h1>Thompson Sampling Visualization</h1>
+    <div class="button-container">
+        <button onclick="handleClick(0)">Button 0</button>
+        <button onclick="handleClick(1)">Button 1</button>
+        <button onclick="handleClick(2)">Button 2</button>
+    </div>
+    <div class="suggestion">
+        <strong>Suggested Button: </strong><span id="suggested-button">-</span>
+    </div>
+    <div class="visualization">
+        <img id="visualization-img" src="/visualization" alt="Visualization of Thompson Sampling">
+    </div>
+    <script>
+        const socket = io();
+        socket.on("update_visualization", (data) => {
+            const imgElement = document.getElementById("visualization-img");
+            imgElement.src = "data:image/png;base64," + data.visualization;
+        });
+        async function fetchSuggestion() {
+            try {
+                const response = await fetch("/suggest");
+                if (!response.ok) throw new Error("Failed to fetch suggestion.");
+                const data = await response.json();
+                document.getElementById("suggested-button").innerText = data.suggested_button;
+            } catch (error) {
+                console.error("Error fetching suggestion:", error);
+            }
+        }
+
+        async function handleClick(button) {
+            const reward = confirm("Was this button successful? Click OK for Yes or Cancel for No.") ? 1 : 0;
+
+            try {
+                const response = await fetch("/update", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ button: button, reward: reward })
+                });
+
+                if (!response.ok) throw new Error("Failed to update model.");
+                const data = await response.json();
+                console.log("Updated Parameters:", data);
+
+
+                fetchSuggestion();
+            } catch (error) {
+                console.error("Error updating model:", error);
+            }
+        }
+        fetchSuggestion();
+    </script>
+</body>
+
+</html>
