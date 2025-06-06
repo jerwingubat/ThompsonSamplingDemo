@@ -148,7 +148,7 @@ def update():
 
 if __name__ == "__main__":
     socketio = SocketIO(app, async_mode='threading')
-    socketio.run(app, debug=True, use_reloader=False)
+    socketio.run(app, debug=False, use_reloader=False)
 
 
 
