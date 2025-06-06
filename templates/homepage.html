@@ -181,6 +181,7 @@
         }
 
         document.getElementById('suggest-btn').addEventListener('click', () => {
+            const machineNames = ["Email", "SMS", "Push Notification"];
             fetch(`/suggest?user=${currentUser}`)
                 .then(res => res.json())
                 .then(data => {
