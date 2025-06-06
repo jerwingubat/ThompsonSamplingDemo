@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Thompson Sampling</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        .user-controls { margin-bottom: 20px; }
+        .container { display: flex; }
+        .machine-info { margin-right: 30px; }
+        .machine { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+        .recommended { background-color: lightgreen; }
+        #visualization { max-width: 800px; }
+    </style>
+</head>
+<body>
+    <div>
+        <label for="user-select">Select User:</label>
+        <select id="user-select">
+            {% for user in users %}
+                <option value="{{ user }}">{{ user }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="container">
+        <div class="machine-info">
+            <h3>Machines:</h3>
+            <div id="machines-container"></div>
+            <button id="suggest-btn">Get Recommendation</button>
+            <div id="recommendation"></div>
+        </div>
+
+        <div class="visualization">
+            <h3>Visualization:</h3>
+            <img id="visualization" src="" alt="Stats Visualization" />
+        </div>
+    </div>
+
+<script>
+    const socket = io();
+    let currentUser = document.getElementById('user-select').value;
+
+    function setupMachines() {
+        const container = document.getElementById('machines-container');
+        container.innerHTML = '';
+        for(let i=0; i<3; i++) {
+            const div = document.createElement('div');
+            div.className = 'machine';
+            div.innerHTML = `
+                <h4>Machine ${i}</h4>
+                <button class="reward-btn" data-machine="${i}" data-reward="1">Success</button>
+                <button class="reward-btn" data-machine="${i}" data-reward="0">Failure</button>
+                <div>Selections: <span id="count-${i}">0</span></div>
+                <div>True Reward: <span id="true-${i}">?</span></div>
+            `;
+            container.appendChild(div);
+        }
+
+        document.querySelectorAll('.reward-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const machine = this.dataset.machine;
+                const reward = parseInt(this.dataset.reward);
+                updateMachine(machine, reward);
+            });
+        });
+    }
+
+    function updateMachine(machine, reward) {
+        fetch('/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user: currentUser,
+                button: machine,
+                reward: reward
+            })
+        }).then(res => {
+            if (!res.ok) console.error("Update failed");
+        });
+    }
+
+    function updateVisualization() {
+        fetch(`/visualization?user=${currentUser}`)
+            .then(res => res.text())
+            .then(data => {
+                document.getElementById('visualization').src = data;
+            });
+    }
+
+    document.getElementById('suggest-btn').addEventListener('click', () => {
+        fetch(`/suggest?user=${currentUser}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) {
+                    alert(data.error);
+                    return;
+                }
+                document.getElementById('recommendation').textContent = `Recommended: Machine ${data.suggested_button}`;
+                document.querySelectorAll('.machine').forEach((el,i) => {
+                    el.classList.toggle('recommended', i === data.suggested_button);
+                });
+            });
+    });
+
+    socket.on('update_visualization', data => {
+        if(data.user === currentUser) {
+            data.selection_counts.forEach((count,i) => {
+                document.getElementById(`count-${i}`).textContent = count;
+            });
+            data.true_rewards.forEach((reward,i) => {
+                document.getElementById(`true-${i}`).textContent = reward.toFixed(3);
+            });
+            document.getElementById('visualization').src = "data:image/png;base64," + data.visualization;
+        }
+    });
+
+    document.getElementById('user-select').addEventListener('change', (e) => {
+        currentUser = e.target.value;
+        document.getElementById('recommendation').textContent = '';
+        setupMachines();
+        updateVisualization();
+    });
+
+    setupMachines();
+    updateVisualization();
+</script>
+</body>
+</html>

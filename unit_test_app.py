@@ -6,8 +6,7 @@ import matplotlib.pyplot as plt
 class TestAppPlots(unittest.TestCase):
 
     def setUp(self):
-        # Setup code to initialize the necessary variables and objects
-        self.ts = type('', (), {})()  # Create a simple object to hold attributes
+        self.ts = type('', (), {})()
         self.ts.n_machines = 3
         self.ts.alpha = [1, 2, 3]
         self.ts.beta = [1, 2, 3]
