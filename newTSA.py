@@ -63,23 +63,27 @@ def suggest():
         "suggested_button": int(suggested_button),
         "user": username
     })
-
+    
+    
+machine_names = ["Email", "SMS", "Push Notification"]
 def generate_visualization(ts, selections):
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
     axs[0, 0].bar(range(ts.n_machines), ts.selection_counts, color='skyblue')
-    axs[0, 0].set_title("Machine Selection Counts")
-    axs[0, 0].set_xlabel("Machine")
+    axs[0, 0].set_title("Arm Selection Counts")
+    axs[0, 0].set_xlabel("Arm")
     axs[0, 0].set_ylabel("Count")
     axs[0, 0].set_xticks(range(ts.n_machines))
-
+    axs[0, 0].set_xticklabels(machine_names)
+    
     x = np.linspace(0, 1, 100)
     for i in range(ts.n_machines):
         y = beta.pdf(x, ts.alpha[i], ts.beta[i])
-        axs[0, 1].plot(x, y, label=f"Machine {i}")
+        axs[0, 1].plot(x, y, label=machine_names[i])
     axs[0, 1].set_title("Beta Distributions")
     axs[0, 1].set_xlabel("Probability of Success")
     axs[0, 1].set_ylabel("Density")
     axs[0, 1].legend()
+    
 
     if selections:
         axs[1, 0].plot(np.cumsum(selections), label="Cumulative Rewards")
@@ -94,9 +98,11 @@ def generate_visualization(ts, selections):
     estimated = ts.alpha / (ts.alpha + ts.beta)
     axs[1, 1].bar(range(ts.n_machines), estimated, alpha=0.4, label='Estimated')
     axs[1, 1].set_title("True vs Estimated Rewards")
-    axs[1, 1].set_xlabel("Machine")
+    axs[1, 1].set_xlabel("Arm")
     axs[1, 1].set_ylabel("Reward Probability")
     axs[1, 1].legend()
+    axs[1, 1].set_xticks(range(ts.n_machines))
+    axs[1, 1].set_xticklabels(machine_names)
 
     plt.tight_layout()
     img = io.BytesIO()
